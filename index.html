@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wait List MPI Converter — PaSSPort</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f3; color: #1a1a18; min-height: 100vh; padding: 2rem 1rem;
+  }
+  .page { max-width: 860px; margin: 0 auto; }
+  header { margin-bottom: 2rem; }
+  .eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 0.4rem; }
+  h1 { font-size: 22px; font-weight: 500; color: #1a1a18; line-height: 1.3; }
+  h1 span { color: #1D9E75; }
+  .subtitle { font-size: 14px; color: #666; margin-top: 0.4rem; line-height: 1.6; }
+
+  .card { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+  .card-title { font-size: 13px; font-weight: 500; color: #444; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+  .step-badge { width: 20px; height: 20px; border-radius: 50%; background: #1D9E75; color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  /* Instance tabs */
+  .instance-tabs { display: flex; gap: 8px; margin-bottom: 1.25rem; }
+  .tab-btn {
+    padding: 7px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;
+    border: 1px solid #ddd; background: #f5f5f3; color: #555; transition: all 0.15s;
+  }
+  .tab-btn.active { background: #1D9E75; color: #fff; border-color: #1D9E75; }
+  .tab-btn:hover:not(.active) { border-color: #1D9E75; color: #1D9E75; }
+
+  .instance-panel { display: none; }
+  .instance-panel.active { display: block; }
+
+  .instance-label {
+    font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #1D9E75; margin-bottom: 0.75rem;
+  }
+
+  /* Drop zones */
+  .drop-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .drop-col label { display: block; font-size: 12px; color: #666; margin-bottom: 6px; }
+  .drop-zone {
+    border: 1.5px dashed #ccc; border-radius: 8px; padding: 1.25rem;
+    text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #1D9E75; background: #f0fdf8; }
+  .drop-zone.loaded { border-color: #1D9E75; background: #f0fdf8; }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-label { font-size: 12px; color: #666; pointer-events: none; }
+  .drop-label strong { color: #1a1a18; font-weight: 500; }
+  .file-icon { font-size: 24px; margin-bottom: 4px; pointer-events: none; display: block; }
+  .drop-filename { font-size: 11px; color: #1D9E75; font-weight: 500; margin-top: 3px; pointer-events: none; }
+
+  /* IIT fields */
+  .iit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .iit-field label { display: block; font-size: 12px; color: #666; margin-bottom: 5px; }
+  .iit-field input {
+    width: 100%; border: 0.5px solid #ccc; border-radius: 6px;
+    padding: 7px 10px; font-size: 13px; font-family: monospace; color: #1a1a18; background: #fafafa;
+  }
+  .iit-field input:focus { outline: none; border-color: #1D9E75; background: #fff; }
+  .iit-field .arrow { font-size: 11px; color: #aaa; margin: 3px 0 5px; }
+  .iit-field input[readonly] { color: #888; }
+
+  .run-btn {
+    width: 100%; padding: 11px; background: #1D9E75; color: #fff;
+    border: none; border-radius: 8px; font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s; margin-top: 0.5rem;
+  }
+  .run-btn:hover { background: #0F6E56; }
+  .run-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+  .log-area {
+    background: #0e1117; border-radius: 8px; padding: 1rem;
+    font-family: monospace; font-size: 12px; line-height: 1.7; color: #c9d1d9;
+    min-height: 120px; max-height: 300px; overflow-y: auto; display: none; margin-top: 1rem;
+  }
+  .log-area.visible { display: block; }
+  .log-ok { color: #56d364; } .log-warn { color: #e3b341; }
+  .log-info { color: #79c0ff; } .log-err { color: #f85149; }
+
+  .stats-grid { display: none; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 1rem; }
+  .stats-grid.visible { display: grid; }
+  .stat-card { background: #f8f8f6; border: 0.5px solid #e0e0dc; border-radius: 8px; padding: 0.75rem 1rem; }
+  .stat-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+  .stat-val { font-size: 18px; font-weight: 500; color: #1D9E75; }
+  .stat-val.warn { color: #c8821a; }
+
+  .download-btn {
+    width: 100%; padding: 11px; background: #fff; color: #1D9E75;
+    border: 1.5px solid #1D9E75; border-radius: 8px; font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s; margin-top: 1rem; display: none;
+  }
+  .download-btn.visible { display: block; }
+  .download-btn:hover { background: #f0fdf8; }
+
+  .rules-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .rules-list li { font-size: 13px; color: #555; display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+  .rule-dot { width: 6px; height: 6px; border-radius: 50%; background: #1D9E75; margin-top: 5px; flex-shrink: 0; }
+  code { font-family: monospace; font-size: 11.5px; background: #f0f0ec; border-radius: 3px; padding: 1px 4px; color: #333; }
+
+  .divider { border: none; border-top: 0.5px solid #eee; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">PaSSPort · Wait List Migration</div>
+    <h1>Wait list <span>MPI converter</span></h1>
+    <p class="subtitle">Select an instance, upload both export files, and download the import-ready XML. Each row is verified by patient ID, department, and visit type before any PRC is written.</p>
+  </header>
+
+  <!-- Step 1 & 2 combined: instance selection + files + IIT config -->
+  <div class="card">
+    <div class="card-title"><span class="step-badge">1</span> Select instance and upload files</div>
+
+    <div class="instance-tabs">
+      <button class="tab-btn active" onclick="switchInstance('nch')">NCH</button>
+      <button class="tab-btn" onclick="switchInstance('eeh')">EEH</button>
+    </div>
+
+    <!-- NCH panel -->
+    <div class="instance-panel active" id="panel-nch">
+      <div class="instance-label">NCH instance</div>
+      <div class="drop-row">
+        <div class="drop-col">
+          <label>Waitlist export <em style="color:#aaa">(with MPI formatting)</em></label>
+          <div class="drop-zone" id="zone-nch-wl">
+            <input type="file" accept=".xml" id="file-nch-wl">
+            <span class="file-icon">📄</span>
+            <div class="drop-label"><strong>Drop XML here</strong><br>or click to browse</div>
+            <div class="drop-filename" id="name-nch-wl"></div>
+          </div>
+        </div>
+        <div class="drop-col">
+          <label>No-MPI export <em style="color:#aaa">(plain IDs)</em></label>
+          <div class="drop-zone" id="zone-nch-nm">
+            <input type="file" accept=".xml" id="file-nch-nm">
+            <span class="file-icon">📄</span>
+            <div class="drop-label"><strong>Drop XML here</strong><br>or click to browse</div>
+            <div class="drop-filename" id="name-nch-nm"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EEH panel -->
+    <div class="instance-panel" id="panel-eeh">
+      <div class="instance-label">EEH instance</div>
+      <div class="drop-row">
+        <div class="drop-col">
+          <label>Waitlist export <em style="color:#aaa">(with MPI formatting)</em></label>
+          <div class="drop-zone" id="zone-eeh-wl">
+            <input type="file" accept=".xml" id="file-eeh-wl">
+            <span class="file-icon">📄</span>
+            <div class="drop-label"><strong>Drop XML here</strong><br>or click to browse</div>
+            <div class="drop-filename" id="name-eeh-wl"></div>
+          </div>
+        </div>
+        <div class="drop-col">
+          <label>No-MPI export <em style="color:#aaa">(plain IDs)</em></label>
+          <div class="drop-zone" id="zone-eeh-nm">
+            <input type="file" accept=".xml" id="file-eeh-nm">
+            <span class="file-icon">📄</span>
+            <div class="drop-label"><strong>Drop XML here</strong><br>or click to browse</div>
+            <div class="drop-filename" id="name-eeh-nm"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: IIT config (updates dynamically per instance) -->
+  <div class="card">
+    <div class="card-title"><span class="step-badge">2</span> IIT type mapping</div>
+    <div class="iit-grid">
+      <div class="iit-field">
+        <label>EPT — from</label>
+        <input type="text" id="ept-from" readonly>
+        <div class="arrow">↓ maps to</div>
+        <label>EPT — to</label>
+        <input type="text" id="ept-to">
+      </div>
+      <div class="iit-field">
+        <label>DEP — from</label>
+        <input type="text" id="dep-from" readonly>
+        <div class="arrow">↓ maps to</div>
+        <label>DEP — to</label>
+        <input type="text" id="dep-to">
+      </div>
+      <div class="iit-field">
+        <label>PRC IIT type</label>
+        <input type="text" id="prc-iit">
+        <div class="arrow">&nbsp;</div>
+        <label>SER IIT type</label>
+        <input type="text" id="ser-iit">
+      </div>
+      <div class="iit-field" style="display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:2px;">
+        <div style="font-size:11px; color:#999; line-height:1.6;">
+          Values pre-filled per instance.<br>Edit if needed before converting.
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div style="font-size:12px; color:#666; margin-bottom:8px;">What this tool does</div>
+    <ul class="rules-list">
+      <li><span class="rule-dot"></span>Verifies each PRC row matches by patient ID, department name, and visit type name before writing</li>
+      <li><span class="rule-dot"></span>Builds PRC MPI: <code>{{MPI}}DEP_PRC,-1,{prc-iit}</code> using plain IDs from the no-MPI file</li>
+      <li><span class="rule-dot"></span>Updates EPT IIT type: <code>,-1,{ept-from}</code> → <code>,-1,{ept-to}</code></li>
+      <li><span class="rule-dot"></span>Updates DEP IIT type: <code>,-1,{dep-from}</code> → <code>,-1,{dep-to}</code></li>
+      <li><span class="rule-dot"></span>Fills missing SER MPIs: <code>No MPI found for &lt;ID&gt;</code> → <code>{{MPI}}&lt;ID&gt;,-1,{ser-iit}</code> (patient and continuation rows)</li>
+    </ul>
+  </div>
+
+  <!-- Step 3: Convert -->
+  <div class="card">
+    <div class="card-title"><span class="step-badge">3</span> Convert and download</div>
+    <button class="run-btn" id="run-btn" disabled>Convert file</button>
+
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="stat-label">Rows processed</div><div class="stat-val" id="stat-rows">—</div></div>
+      <div class="stat-card"><div class="stat-label">PRC MPIs added</div><div class="stat-val" id="stat-prc">—</div></div>
+      <div class="stat-card"><div class="stat-label">IIT types updated</div><div class="stat-val" id="stat-iit">—</div></div>
+      <div class="stat-card"><div class="stat-label">SER gaps filled</div><div class="stat-val" id="stat-ser">—</div></div>
+      <div class="stat-card"><div class="stat-label">Verification failures</div><div class="stat-val warn" id="stat-fail">—</div></div>
+    </div>
+
+    <div class="log-area" id="log"></div>
+    <button class="download-btn" id="dl-btn">Download converted XML</button>
+  </div>
+
+</div>
+
+<script>
+const SS = 'urn:schemas-microsoft-com:office:spreadsheet';
+
+const INSTANCES = {
+  nch: { eptFrom: '14', eptTo: '448', depFrom: '36', depTo: '447', prcIit: '888', serIit: '300000881' },
+  eeh: { eptFrom: '0',  eptTo: '450', depFrom: '80', depTo: '521', prcIit: '999', serIit: '300000882' }
+};
+
+let currentInstance = 'nch';
+let files = { nch: { wl: null, nm: null }, eeh: { wl: null, nm: null } };
+let outputBlob = null;
+
+function switchInstance(inst) {
+  currentInstance = inst;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.instance-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab-btn[onclick="switchInstance('${inst}')"]`).classList.add('active');
+  document.getElementById(`panel-${inst}`).classList.add('active');
+  loadIitValues(inst);
+  checkReady();
+}
+
+function loadIitValues(inst) {
+  const cfg = INSTANCES[inst];
+  document.getElementById('ept-from').value = cfg.eptFrom;
+  document.getElementById('ept-to').value   = cfg.eptTo;
+  document.getElementById('dep-from').value = cfg.depFrom;
+  document.getElementById('dep-to').value   = cfg.depTo;
+  document.getElementById('prc-iit').value  = cfg.prcIit;
+  document.getElementById('ser-iit').value  = cfg.serIit;
+}
+
+function checkReady() {
+  const f = files[currentInstance];
+  document.getElementById('run-btn').disabled = !(f.wl && f.nm);
+}
+
+function setupZone(zoneId, inputId, nameId, inst, which) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  const nameEl = document.getElementById(nameId);
+  const handle = f => {
+    if (!f) return;
+    files[inst][which] = f;
+    nameEl.textContent = f.name;
+    zone.classList.add('loaded');
+    if (inst === currentInstance) checkReady();
+  };
+  input.addEventListener('change', () => handle(input.files[0]));
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.endsWith('.xml')) handle(f);
+  });
+}
+
+setupZone('zone-nch-wl', 'file-nch-wl', 'name-nch-wl', 'nch', 'wl');
+setupZone('zone-nch-nm', 'file-nch-nm', 'name-nch-nm', 'nch', 'nm');
+setupZone('zone-eeh-wl', 'file-eeh-wl', 'name-eeh-wl', 'eeh', 'wl');
+setupZone('zone-eeh-nm', 'file-eeh-nm', 'name-eeh-nm', 'eeh', 'nm');
+
+// Init IIT values for default instance
+loadIitValues('nch');
+
+function log(msg, cls='') {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function sanitizeXml(str) {
+  return str.replace(/&#([0-9]+);/g, (match, num) => {
+    const n = parseInt(num, 10);
+    return (n === 9 || n === 10 || n === 13 || n >= 32) ? match : '';
+  });
+}
+
+function sparseMap(row) {
+  const map = {};
+  let pos = 0;
+  for (const cell of row.getElementsByTagNameNS(SS, 'Cell')) {
+    const idx = cell.getAttributeNS(SS, 'Index');
+    pos = idx ? parseInt(idx, 10) : pos + 1;
+    map[pos] = cell;
+  }
+  return map;
+}
+
+function cellVal(map, col) {
+  const c = map[col];
+  if (!c) return '';
+  const d = c.getElementsByTagNameNS(SS, 'Data')[0];
+  return d ? (d.textContent || '') : '';
+}
+
+function setCellText(wlDoc, cell, text) {
+  let d = cell.getElementsByTagNameNS(SS, 'Data')[0];
+  if (!d) {
+    d = wlDoc.createElementNS(SS, 'ss:Data');
+    d.setAttributeNS(SS, 'ss:Type', 'String');
+    cell.appendChild(d);
+  }
+  d.textContent = text;
+}
+
+function bareId(mpiStr) {
+  return mpiStr.replace(/^\{\{MPI\}\}/, '').split(',-1,')[0];
+}
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('log').classList.add('visible');
+  document.getElementById('stats-grid').classList.remove('visible');
+  document.getElementById('dl-btn').classList.remove('visible');
+  document.getElementById('run-btn').disabled = true;
+  outputBlob = null;
+
+  const inst   = currentInstance;
+  const wlFile = files[inst].wl;
+  const nmFile = files[inst].nm;
+
+  const eptFrom = document.getElementById('ept-from').value.trim();
+  const eptTo   = document.getElementById('ept-to').value.trim();
+  const depFrom = document.getElementById('dep-from').value.trim();
+  const depTo   = document.getElementById('dep-to').value.trim();
+  const prcIit  = document.getElementById('prc-iit').value.trim();
+  const serIit  = document.getElementById('ser-iit').value.trim();
+
+  log(`Instance: ${inst.toUpperCase()} | EPT ${eptFrom}→${eptTo} | DEP ${depFrom}→${depTo} | PRC IIT ${prcIit} | SER IIT ${serIit}`, 'log-info');
+  log('Reading files…', 'log-info');
+
+  try {
+    const [wlText, nmText] = await Promise.all([wlFile.text(), nmFile.text()]);
+    log('Parsing XML…', 'log-info');
+
+    const parser = new DOMParser();
+    const wlDoc  = parser.parseFromString(sanitizeXml(wlText), 'application/xml');
+    const nmDoc  = parser.parseFromString(sanitizeXml(nmText), 'application/xml');
+
+    if (wlDoc.querySelector('parsererror')) { log('Error parsing waitlist XML.', 'log-err'); return; }
+    if (nmDoc.querySelector('parsererror')) { log('Error parsing no-MPI XML.', 'log-err'); return; }
+
+    const wlRows = Array.from(wlDoc.getElementsByTagNameNS(SS, 'Row'));
+    const nmRows = Array.from(nmDoc.getElementsByTagNameNS(SS, 'Row'));
+
+    log(`Waitlist rows: ${wlRows.length} | No-MPI rows: ${nmRows.length}`, 'log-info');
+    if (wlRows.length !== nmRows.length) {
+      log('Warning: row counts differ — files may be mismatched.', 'log-warn');
+    }
+
+    const HEADER_ROWS = 4;
+    let statRows = 0, statPrc = 0, statIit = 0, statSer = 0, statFail = 0;
+    const rowCount = Math.min(wlRows.length, nmRows.length);
+
+    for (let i = HEADER_ROWS; i < rowCount; i++) {
+      const wlRow = wlRows[i];
+      const nmRow = nmRows[i];
+      const wlMap = sparseMap(wlRow);
+      const nmMap = sparseMap(nmRow);
+
+      // ── SER cols 8 and 10: fix on EVERY row (patient + continuation) ──────
+      for (const col of [8, 10]) {
+        if (wlMap[col]) {
+          const t = cellVal(wlMap, col);
+          if (t.startsWith('No MPI found for ')) {
+            const serId = t.replace('No MPI found for ', '').trim();
+            setCellText(wlDoc, wlMap[col], `{{MPI}}${serId},-1,${serIit}`);
+            statSer++;
+          }
+        }
+      }
+
+      // Skip continuation rows for all remaining transforms
+      const wlPtRaw = cellVal(wlMap, 1);
+      const isPatientRow = wlPtRaw.startsWith('{{MPI}}') && wlPtRaw.includes(`,-1,${eptFrom}`);
+      if (!isPatientRow) continue;
+
+      statRows++;
+
+      // ── EPT: update IIT type ──────────────────────────────────────────────
+      if (wlMap[1]) {
+        const t = cellVal(wlMap, 1);
+        if (t.includes(`,-1,${eptFrom}`)) {
+          setCellText(wlDoc, wlMap[1], t.replace(`,-1,${eptFrom}`, `,-1,${eptTo}`));
+          statIit++;
+        }
+      }
+
+      // ── DEP cols 3, 4, 5, 6: update IIT type or fill No MPI found ─────────
+      // NCH uses cols 3 & 5 for DEP IDs; EEH uses cols 4 & 6.
+      // We check all four so the tool works for both instances.
+      for (const col of [3, 4, 5, 6]) {
+        if (wlMap[col]) {
+          const t = cellVal(wlMap, col);
+          if (t.includes(`,-1,${depFrom}`)) {
+            setCellText(wlDoc, wlMap[col], t.replace(`,-1,${depFrom}`, `,-1,${depTo}`));
+            statIit++;
+          } else if (t.startsWith('No MPI found for ')) {
+            const depId = t.replace('No MPI found for ', '').trim();
+            setCellText(wlDoc, wlMap[col], `{{MPI}}${depId},-1,${depTo}`);
+            statIit++;
+          }
+        }
+      }
+
+      // ── PRC col 14: build MPI with row-level verification ─────────────────
+      if (wlMap[14]) {
+        const t = cellVal(wlMap, 14);
+        // Trigger on either "No MPI found for X" OR a bare plain numeric ID (no {{MPI}} prefix)
+        const needsPrc = t.startsWith('No MPI found for ') || (t && !t.startsWith('{{MPI}}'));
+        if (needsPrc) {
+          const wlPtId    = bareId(cellVal(wlMap, 1));
+          const nmPtId    = bareId(cellVal(nmMap, 1));
+          const wlDepName = cellVal(wlMap, 5);
+          const nmDepName = cellVal(nmMap, 5);
+          const wlVtName  = cellVal(wlMap, 15);
+          const nmVtName  = cellVal(nmMap, 15);
+
+          const ptOk  = wlPtId && nmPtId && wlPtId === nmPtId;
+          const depOk = wlDepName === nmDepName;
+          const vtOk  = wlVtName  === nmVtName;
+
+          if (!ptOk || !depOk || !vtOk) {
+            statFail++;
+            const reasons = [];
+            if (!ptOk)  reasons.push(`patient "${wlPtId}" vs "${nmPtId}"`);
+            if (!depOk) reasons.push(`dept "${wlDepName}" vs "${nmDepName}"`);
+            if (!vtOk)  reasons.push(`visit type "${wlVtName}" vs "${nmVtName}"`);
+            log(`Row ${i}: verification failed — ${reasons.join('; ')} — PRC skipped`, 'log-err');
+            continue;
+          }
+
+          // Plain DEP from no-MPI col 4, plain PRC from no-MPI col 14
+          const plainDep = cellVal(nmMap, 4);
+          const plainPrc = cellVal(nmMap, 14);
+
+          if (plainDep && plainPrc) {
+            setCellText(wlDoc, wlMap[14], `{{MPI}}${plainDep}_${plainPrc},-1,${prcIit}`);
+            statPrc++;
+          } else {
+            statFail++;
+            log(`Row ${i}: could not resolve PRC — DEP="${plainDep}" PRC="${plainPrc}"`, 'log-warn');
+          }
+        }
+      }
+    }
+
+    // Final scan for any remaining No MPI found
+    let remaining = 0;
+    for (const d of wlDoc.getElementsByTagNameNS(SS, 'Data')) {
+      if ((d.textContent || '').includes('No MPI found')) remaining++;
+    }
+
+    log(
+      `Done. PRC MPIs added: ${statPrc} | IIT updates: ${statIit} | SER gaps filled: ${statSer} | Failures: ${statFail}`,
+      statFail > 0 ? 'log-warn' : 'log-ok'
+    );
+    if (remaining > 0) {
+      log(`Warning: ${remaining} "No MPI found" entries remain unresolved.`, 'log-warn');
+    } else {
+      log('All MPI references resolved.', 'log-ok');
+    }
+
+    outputBlob = new Blob([new XMLSerializer().serializeToString(wlDoc)], { type: 'application/xml' });
+
+    document.getElementById('stat-rows').textContent = statRows.toLocaleString();
+    document.getElementById('stat-prc').textContent  = statPrc.toLocaleString();
+    document.getElementById('stat-iit').textContent  = statIit.toLocaleString();
+    document.getElementById('stat-ser').textContent  = statSer.toLocaleString();
+    document.getElementById('stat-fail').textContent = statFail.toLocaleString();
+    document.getElementById('stats-grid').classList.add('visible');
+    document.getElementById('dl-btn').classList.add('visible');
+
+  } catch (err) {
+    log(`Unexpected error: ${err.message}`, 'log-err');
+    console.error(err);
+  } finally {
+    document.getElementById('run-btn').disabled = false;
+  }
+});
+
+document.getElementById('dl-btn').addEventListener('click', () => {
+  if (!outputBlob) return;
+  const wlFile = files[currentInstance].wl;
+  const base = (wlFile ? wlFile.name.replace('.xml', '') : 'waitlist') + '_converted';
+  const url = URL.createObjectURL(outputBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = base + '.xml'; a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
