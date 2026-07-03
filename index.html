@@ -412,7 +412,25 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         }
       }
 
-      // Skip continuation rows for all remaining transforms
+      // ── DEP cols 3, 4, 5, 6: fix on EVERY row (patient + continuation) ────
+      // Continuation rows carry their own DEP IIT entries that must be updated
+      // independently of whether col 1 has a patient MPI.
+      // NCH uses cols 3 & 5; EEH uses cols 4 & 6 -- check all four for both.
+      for (const col of [3, 4, 5, 6]) {
+        if (wlMap[col]) {
+          const t = cellVal(wlMap, col);
+          if (t.includes(`,-1,${depFrom}`)) {
+            setCellText(wlDoc, wlMap[col], t.replace(`,-1,${depFrom}`, `,-1,${depTo}`));
+            statIit++;
+          } else if (t.startsWith('No MPI found for ')) {
+            const depId = t.replace('No MPI found for ', '').trim();
+            setCellText(wlDoc, wlMap[col], `{{MPI}}${depId},-1,${depTo}`);
+            statIit++;
+          }
+        }
+      }
+
+      // Skip continuation rows for EPT and PRC transforms only
       const wlPtRaw = cellVal(wlMap, 1);
       const isPatientRow = wlPtRaw.startsWith('{{MPI}}') && wlPtRaw.includes(`,-1,${eptFrom}`);
       if (!isPatientRow) continue;
@@ -425,23 +443,6 @@ document.getElementById('run-btn').addEventListener('click', async () => {
         if (t.includes(`,-1,${eptFrom}`)) {
           setCellText(wlDoc, wlMap[1], t.replace(`,-1,${eptFrom}`, `,-1,${eptTo}`));
           statIit++;
-        }
-      }
-
-      // ── DEP cols 3, 4, 5, 6: update IIT type or fill No MPI found ─────────
-      // NCH uses cols 3 & 5 for DEP IDs; EEH uses cols 4 & 6.
-      // We check all four so the tool works for both instances.
-      for (const col of [3, 4, 5, 6]) {
-        if (wlMap[col]) {
-          const t = cellVal(wlMap, col);
-          if (t.includes(`,-1,${depFrom}`)) {
-            setCellText(wlDoc, wlMap[col], t.replace(`,-1,${depFrom}`, `,-1,${depTo}`));
-            statIit++;
-          } else if (t.startsWith('No MPI found for ')) {
-            const depId = t.replace('No MPI found for ', '').trim();
-            setCellText(wlDoc, wlMap[col], `{{MPI}}${depId},-1,${depTo}`);
-            statIit++;
-          }
         }
       }
 
